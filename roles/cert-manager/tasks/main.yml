@@ -66,8 +66,3 @@
     state: present
     template: 'ca-issuer.yaml.j2'
   when: use_internal_ca | bool
-
-- name: Delete cert-manager config directory on first master
-  file:
-    path: /tmp/cert-manager
-    state: absent
