@@ -1,46 +1,23 @@
 ---
 #do some stuff here to pull the kube config, install helm, pull the traefik chart and deploy traefik
-
-- name: Create traefik config directory on first master
-  file:
-    path: /tmp/traefik-int
-    state: directory
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-
-- name: Copy traefik chart values to first master
-  template:
-    src: "traefik-chart-values.yaml.j2"
-    dest: /tmp/traefik-int/traefik-chart-values.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-
-- name: Copy traefik config to first master
-  template:
-    src: "traefik-config.yaml.j2"
-    dest: /tmp/traefik-int/traefik-config.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-
-- name: Copy traefik dashboard manifest to first master
-  template:
-    src: "dashboard.yaml.j2"
-    dest: /tmp/traefik-int/dashboard.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
+- name: Ensure packages exist
+  package:
+    name: "{{ item }}"
+    state: present
+  become: true
+  loop:
+    - python3
+    - python3-pip
+    - python3-kubernetes
+    - python3-yaml
+    - python3-jsonpatch
+  when: ansible_os_family == 'Debian'
 
 - name: add traefik helm repo
-  command:
-    cmd: "helm repo add traefik https://helm.traefik.io/traefik"
-  changed_when: true
-
-- name: update helm repo
-  command:
-    cmd: "helm repo update"
-  changed_when: true
+  kubernetes.core.helm_repository:
+    name: traefik
+    repo_url: "https://helm.traefik.io/traefik"
+    state: present
 
 - name: wait for k3s API server VIP {{ apiserver_endpoint }} to be available
   wait_for:
@@ -49,22 +26,29 @@
     delay: 10
 
 - name: deploy traefik using helm
-  command:
-    cmd: "helm install traefik traefik/traefik \
-      --namespace=kube-system \
-      --values=/tmp/traefik-int/traefik-chart-values.yaml
-      --wait"
-  changed_when: true
+  kubernetes.core.helm:
+    name: traefik
+    chart_ref: traefik/traefik
+    namespace: kube-system
+    update_repo_cache: true
+    values: "{{ lookup('template', 'traefik-chart-values.yaml.j2') | from_yaml }}"
+    wait: yes
 
 - name: apply traefik default headers
-  command:
-    cmd: kubectl apply -f /tmp/traefik-int/traefik-config.yaml
-  changed_when: true
+  kubernetes.core.k8s:
+    state: present
+    template: 'traefik-config.yaml.j2'
 
 - name: apply traefik dashboard
-  command:
-    cmd: kubectl apply -f /tmp/traefik-int/dashboard.yaml
-  changed_when: true
+  kubernetes.core.k8s:
+    state: present
+    template: 'dashboard.yaml.j2'
+
+# ########################################################
+- name: Delete traefik-int config directory on first master
+  file:
+    path: /tmp/traefik-int
+    state: absent
 
 - name: Clean up traefik tmp dir
   file:
