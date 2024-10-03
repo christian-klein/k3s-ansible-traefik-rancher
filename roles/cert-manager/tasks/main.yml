@@ -10,8 +10,10 @@
     - python3-kubernetes
     - python3-yaml
     - python3-jsonpatch
-    - kubectl
-    - helm
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
   when: ansible_os_family == 'Debian'
 
 - name: Add cert-manager helm repo

@@ -1,5 +1,5 @@
 ---
-#do some stuff here to pull the kube config, install helm, pull the traefik chart and deploy traefik
+
 - name: Ensure packages exist
   package:
     name: "{{ item }}"
@@ -11,8 +11,10 @@
     - python3-kubernetes
     - python3-yaml
     - python3-jsonpatch
-    - kubectl
-    - helm
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
   when: ansible_os_family == 'Debian'
 
 - name: add traefik helm repo
