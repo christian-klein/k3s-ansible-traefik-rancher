@@ -1,48 +1,22 @@
 ---
-- name: Create cert-manager config directory on first master
-  file:
-    path: /tmp/cert-manager
-    state: directory
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-  when: use_internal_ca | bool
+- name: Ensure packages exist
+  package:
+    name: "{{ item }}"
+    state: present
+  become: true
+  loop:
+    - python3
+    - python3-pip
+    - python3-kubernetes
+    - python3-yaml
+    - python3-jsonpatch
+  when: ansible_os_family == 'Debian'
 
-- name: Copy values to first master
-  template:
-    src: "values.yaml.j2"
-    dest: /tmp/cert-manager/values.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-  when: use_internal_ca | bool
-
-- name: Copy internal-ca to first master
-  template:
-    src: "internal-ca.yaml.j2"
-    dest: /tmp/cert-manager/internal-ca.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-  when: use_internal_ca | bool
-
-- name: Copy ca-issuer to first master
-  template:
-    src: "ca-issuer.yaml.j2"
-    dest: /tmp/cert-manager/ca-issuer.yaml
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-  when: use_internal_ca | bool
-
-- name: add cert-manager helm repo
-  command:
-    cmd: "helm repo add jetstack https://charts.jetstack.io"
-  changed_when: true
-
-- name: update helm repo
-  command:
-    cmd: "helm repo update"
-  changed_when: true
+- name: Add cert-manager helm repo
+  kubernetes.core.helm_repository:
+    name: jetstack
+    repo_url: "https://charts.jetstack.io"
+    state: present
 
 - name: wait for k3s API server VIP {{ apiserver_endpoint }} to be available
   wait_for:
@@ -51,52 +25,49 @@
     delay: 10
 
 - name: apply cert-manager CRDs
-  command:
-    cmd: k3s kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/{{ cert_manager_ver }}/cert-manager.crds.yaml
-  retries: 2
-  delay: 3
-  changed_when: true
+  kubernetes.core.k8s:
+    state: present
+    src: "https://github.com/jetstack/cert-manager/releases/download/{{ cert_manager_ver }}/cert-manager.crds.yaml"
 
 - name: create cert-manager namespace
-  command:
-    cmd: k3s kubectl create namespace cert-manager
-  retries: 2
-  delay: 3
-  changed_when: true
+  kubernetes.core.k8s:
+    name: cert-manager
+    api_version: v1
+    kind: Namespace
+    state: present
 
 - name: apply cert-manager internal-ca configmap
-  command:
-    cmd: k3s kubectl apply -f /tmp/cert-manager/internal-ca.yaml
-  retries: 2
-  delay: 3
-  changed_when: true
+  kubernetes.core.k8s:
+    state: present
+    template: 'internal-ca.yaml.j2'
   when: use_internal_ca | bool
 
 - name: deploy cert-manager using helm with internal CA
-  command:
-    cmd: "helm install \
-      cert-manager jetstack/cert-manager \
-      --namespace cert-manager \
-      --version {{ cert_manager_ver }} \
-      --values=/tmp/cert-manager/values.yaml
-      --wait"
-  changed_when: true
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    namespace: cert-manager
+    version: "{{ cert_manager_ver }}"
+    values: "{{ lookup('template', 'values.yaml.j2') | from_yaml }}"
+    wait: yes
   when: use_internal_ca | bool
 
 - name: deploy cert-manager using helm without internal CA
-  command:
-    cmd: "helm install \
-      cert-manager jetstack/cert-manager \
-      --namespace cert-manager \
-      --version {{ cert_manager_ver }} \
-      --wait"
-  changed_when: true
-  when: not use_internal_ca | bool
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    namespace: cert-manager
+    version: "{{ cert_manager_ver }}"
+    wait: yes
+  when: use_internal_ca | bool
 
 - name: create internal CA issuer
-  command:
-    cmd: k3s kubectl apply -f /tmp/cert-manager/ca-issuer.yaml
-  retries: 2
-  delay: 3
-  changed_when: true
+  kubernetes.core.k8s:
+    state: present
+    template: 'ca-issuer.yaml.j2'
   when: use_internal_ca | bool
+
+- name: Delete cert-manager config directory on first master
+  file:
+    path: /tmp/cert-manager
+    state: absent
