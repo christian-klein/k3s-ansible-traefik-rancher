@@ -11,6 +11,8 @@
     - python3-kubernetes
     - python3-yaml
     - python3-jsonpatch
+    - kubectl
+    - helm
   when: ansible_os_family == 'Debian'
 
 - name: add traefik helm repo
