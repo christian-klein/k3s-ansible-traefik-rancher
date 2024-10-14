@@ -54,9 +54,3 @@
   kubernetes.core.k8s:
     state: present
     template: 'dashboard.yaml.j2'
-
-# ####################################################
-- name: Clean up traefik tmp dir
-  file:
-    path: /tmp/traefik-ext/
-    state: absent

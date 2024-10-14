@@ -28,6 +28,9 @@
     host: "{{ apiserver_endpoint }}"
     port: 6443
     delay: 10
+- name: Print helm values
+  debug:
+    msg: "{{ lookup('template', 'traefik-chart-values.yaml.j2') | from_yaml }}"
 
 - name: deploy traefik using helm
   kubernetes.core.helm:
@@ -47,14 +50,3 @@
   kubernetes.core.k8s:
     state: present
     template: 'dashboard.yaml.j2'
-
-# ########################################################
-- name: Delete traefik-int config directory on first master
-  file:
-    path: /tmp/traefik-int
-    state: absent
-
-- name: Clean up traefik tmp dir
-  file:
-    path: /tmp/traefik/
-    state: absent

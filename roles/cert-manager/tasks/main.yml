@@ -46,26 +46,30 @@
     template: 'internal-ca.yaml.j2'
   when: use_internal_ca | bool
 
-- name: deploy cert-manager using helm with internal CA
+- name: deploy cert-manager {{ cert_manager_ver }} using helm with internal CA
   kubernetes.core.helm:
     name: cert-manager
-    chart_ref: jetstack/cert-manager
     namespace: cert-manager
-    version: "{{ cert_manager_ver }}"
+    chart_ref: jetstack/cert-manager
+    chart_version: "{{ cert_manager_ver }}"
     values: "{{ lookup('template', 'values.yaml.j2') | from_yaml }}"
     update_repo_cache: true
     wait: yes
   when: use_internal_ca | bool
 
-- name: deploy cert-manager using helm without internal CA
+- name: deploy cert-manager {{ cert_manager_ver }} using helm without internal CA
   kubernetes.core.helm:
     name: cert-manager
-    chart_ref: jetstack/cert-manager
     namespace: cert-manager
-    version: "{{ cert_manager_ver }}"
+    chart_ref: jetstack/cert-manager
+    chart_version: "{{ cert_manager_ver }}"
     update_repo_cache: true
+    force: true
+    # set_values: 
+    #   - value: extraArgs="'{--dns01-recursive-nameservers-only,--dns01-self-check-nameservers=8.8.8.8:53\\,1.1.1.1:53}'"
+    #   - value_type: string
     wait: yes
-  when: use_internal_ca | bool
+  when: not use_internal_ca | bool
 
 - name: create internal CA issuer
   kubernetes.core.k8s:

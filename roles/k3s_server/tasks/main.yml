@@ -1,4 +1,21 @@
 ---
+- name: Ensure packages exist
+  package:
+    name: "{{ item }}"
+    state: present
+  become: true
+  loop:
+    - python3
+    - python3-pip
+    - python3-kubernetes
+    - python3-yaml
+    - python3-jsonpatch
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - nfs-common
+  when: ansible_os_family == 'Debian'
 
 - name: Stop k3s-init
   systemd:
